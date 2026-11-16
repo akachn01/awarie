@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Awarie parkometrów</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0b5d7a">
+<style>
+:root{
+  --bg:#f3f5f6; --surface:#ffffff; --line:#d9dfe2; --fg:#16212a; --muted:#5b6a75;
+  --accent:#0b5d7a; --accent-fg:#ffffff;
+  --red:#c62828; --red-soft:#fbe4e4; --green:#2e8540; --green-soft:#e2f2e5; --purple:#8e24aa; --purple-soft:#f3e3f7;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0f161b; --surface:#172129; --line:#2a3842; --fg:#e4ebef; --muted:#93a4b0;
+  --accent:#4fb3d6; --accent-fg:#06202b;
+  --red:#ef6b6b; --red-soft:#3b1c1f; --green:#5cc173; --green-soft:#16301d; --purple:#cf7ce6; --purple-soft:#33193b;
+  color-scheme:dark}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.top{position:sticky;top:0;z-index:5;background:var(--accent);color:var(--accent-fg);
+  padding:calc(10px + env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) 10px max(14px,env(safe-area-inset-left,0px));
+  display:flex;flex-direction:column;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.top h1{margin:0;font-size:17px;font-weight:700;display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.top h1 small{font-weight:500;font-size:12px;opacity:.85}
+.row{display:flex;gap:8px}
+select,input{font:inherit;font-size:16px;color:var(--fg);background:var(--surface);border:0;border-radius:8px;padding:8px 10px;min-width:0}
+select{flex:1.3}
+input{flex:1}
+main{padding:12px max(12px,env(safe-area-inset-right,0px)) calc(28px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px;max-width:760px;margin:0 auto}
+.sum{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.sum b{color:var(--fg);font-size:15px}
+.sum .r b{color:var(--red)}
+.group{display:flex;flex-direction:column;gap:8px}
+.group h2{margin:4px 2px 0;font-size:14px;font-weight:700}
+.group h2 span{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--green);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.card.s3{border-left-color:var(--red)} .card.s1{border-left-color:var(--purple)}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.code{font:700 18px ui-monospace,Menlo,Consolas,monospace}
+.pill{border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700}
+.pill.s3{background:var(--red-soft);color:var(--red)} .pill.s2{background:var(--green-soft);color:var(--green)} .pill.s1{background:var(--purple-soft);color:var(--purple)}
+.co{font-size:16px;font-weight:700}
+.nopay{font-size:12px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.03em}
+.meta{font-size:13px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+.meta .low{color:var(--red);font-weight:700}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);padding-top:6px}
+li{display:flex;gap:8px;font-size:13.5px}
+li .d{margin-left:auto;color:var(--muted);white-space:nowrap;font-size:12px;padding-left:6px}
+.dot{flex:none;width:9px;height:9px;border-radius:50%;margin-top:6px;background:var(--muted)}
+.dot.Czerwony{background:var(--red)} .dot.Zielony{background:var(--green)} .dot.Purpurowy{background:var(--purple)}
+.empty{text-align:center;color:var(--muted);padding:40px 10px}
+.foot{font-size:12px;color:var(--muted);text-align:center}
+.top h1 .r{display:flex;gap:8px;align-items:center}
+.refresh{font:inherit;font-size:13px;font-weight:600;color:var(--accent);background:var(--accent-fg);border:0;border-radius:6px;padding:4px 10px;cursor:pointer}
+.refresh:disabled{opacity:.6}
+.stale{background:var(--red-soft);color:var(--red);border-radius:10px;padding:10px 12px;font-size:13.5px;font-weight:600}
+[hidden]{display:none!important}
+.err{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1><span>Awarie parkometrów</span><span class="r"><small id="when">wczytuję…</small><button type="button" class="refresh" id="refresh">Odśwież</button></span></h1>
+  <div class="row">
+    <select id="who" aria-label="Kontroler"></select>
+    <input type="search" id="q" placeholder="Szukaj kodu, adresu" aria-label="Szukaj">
+  </div>
+</header>
+<main>
+  <div class="stale" id="stale" hidden></div>
+  <div class="sum" id="sum"></div>
+  <div id="list"></div>
+  <p class="foot" id="foot"></p>
+</main>
+<script>
+const SEV = {3:"Awaria",2:"Błąd",1:"Komunikacja"};
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ł/g,"l").toLowerCase();
+const NONE = "— bez przypisanego kontrolera —";
+const who = document.getElementById("who"), q = document.getElementById("q");
+
+let DATA = null;
+function setup(){
+document.getElementById("when").textContent = "stan na " + DATA.exportAt;
+document.getElementById("foot").textContent = "Okres: " + DATA.period + ". Opublikowano " + DATA.generated + ".";
+// ostrzeżenie, gdy eksport jest starszy niż 36 godzin (porównanie czasu lokalnego telefonu z czasem eksportu)
+const nowWall = Date.now() - new Date().getTimezoneOffset()*60000;
+const age = DATA.exportAtWall ? (nowWall - DATA.exportAtWall)/3600000 : 0;
+const st = document.getElementById("stale");
+st.hidden = !(age > 36);
+if (age > 36) st.textContent = `Dane mogą być nieaktualne: eksport ma ${Math.floor(age/24)} dni. Sprawdź z kierownikiem.`;
+
+const ctrls = [...new Set(DATA.items.map(d => d.ctrl || NONE))].sort((a,b)=>a===NONE?1:b===NONE?-1:a.localeCompare(b,"pl"));
+const showCtrl = DATA.hasCtrl && ctrls.length > 1;
+if (showCtrl){
+  who.innerHTML = `<option value="">Wszyscy (${DATA.items.length})</option>` +
+    ctrls.map(c => `<option value="${esc(c)}">${esc(c)} (${DATA.items.filter(d=>(d.ctrl||NONE)===c).length})</option>`).join("");
+  try { const s = localStorage.getItem("awarie.kontroler"); if (s && ctrls.includes(s)) who.value = s; } catch(e){}
+} else who.hidden = true;
+render();
+}
+
+function render(){
+  const c = who.value, t = norm(q.value.trim());
+  let items = DATA.items.filter(d => !c || (d.ctrl||NONE) === c);
+  if (t) items = items.filter(d => norm([d.code,d.loc,d.addr,d.co].join(" ")).includes(t));
+  const red = items.filter(d=>d.sev===3).length, np = items.filter(d=>d.noPay).length;
+  document.getElementById("sum").innerHTML =
+    `<span><b>${items.length}</b> parkometrów</span><span class="r"><b>${red}</b> awarie</span><span class="r"><b>${np}</b> nie przyjmuje płatności</span>`;
+  if (!items.length){ document.getElementById("list").innerHTML = `<p class="empty">Brak awarii do pokazania.</p>`; return; }
+  const groups = new Map();
+  for (const d of items){ const k = d.loc || d.addr || "—"; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(d); }
+  const order = [...groups.entries()].sort((a,b) => Math.max(...b[1].map(d=>d.sev)) - Math.max(...a[1].map(d=>d.sev)) || a[0].localeCompare(b[0],"pl"));
+  document.getElementById("list").innerHTML = order.map(([loc, ds]) => `
+    <section class="group">
+      <h2>${esc(loc)}${ds[0].loc && ds[0].addr ? `<span>${esc(ds[0].addr)}</span>` : ""}</h2>
+      ${ds.sort((a,b)=>b.sev-a.sev).map(d => `
+      <article class="card s${d.sev}">
+        <div class="head"><span class="code">${esc(d.code)}</span><span class="pill s${d.sev}">${SEV[d.sev]||""}</span></div>
+        <div><div class="co">${esc(d.co)}</div>${d.noPay ? `<div class="nopay">Nie przyjmuje płatności</div>` : ""}</div>
+        <div class="meta">
+          ${d.tickets!=null ? `<span class="${d.tickets===0?"low":""}">Bilety: ${d.tickets}</span>` : ""}
+          ${d.batt!=null ? `<span class="${d.batt<11.5?"low":""}">Akumulator: ${d.batt.toFixed(2)} V</span>` : ""}
+          ${!c && d.ctrl ? `<span>${esc(d.ctrl)}</span>` : ""}
+        </div>
+        <ul>${d.faults.map(f => `<li><i class="dot ${esc(f.color)}"></i><span>${esc(f.status)}</span><span class="d">${esc(f.start)}</span></li>`).join("")}</ul>
+      </article>`).join("")}
+    </section>`).join("");
+}
+who.addEventListener("change", () => { try { localStorage.setItem("awarie.kontroler", who.value); } catch(e){} render(); });
+q.addEventListener("input", render);
+
+async function load(){
+  const btn=document.getElementById("refresh"); btn.disabled=true;
+  try{
+    const r = await fetch("dane.json?t=" + Date.now(), {cache:"no-store"});
+    if (r.status===404) throw new Error("Brak opublikowanych danych. Kierownik musi najpierw opublikować awarie w panelu administratora.");
+    if (!r.ok) throw new Error("Nie udało się pobrać danych (błąd " + r.status + "). Spróbuj za chwilę.");
+    DATA = await r.json();
+    const keep = who.value;
+    setup();
+    if (keep && [...who.options].some(o=>o.value===keep)) { who.value = keep; render(); }
+  }catch(e){
+    const msg = e instanceof TypeError ? "Brak połączenia z internetem. Spróbuj ponownie." : (e.message || String(e));
+    if (!DATA){ document.getElementById("when").textContent=""; document.getElementById("list").innerHTML = `<p class="err">${esc(msg)}</p>`; }
+    else document.getElementById("foot").textContent = "Nie udało się odświeżyć: " + msg + " Widzisz dane z " + DATA.exportAt + ".";
+  }finally{ btn.disabled=false; }
+}
+document.getElementById("refresh").addEventListener("click", load);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState==="visible" && DATA) load(); });
+load();
+</script>
+</body>
+</html>

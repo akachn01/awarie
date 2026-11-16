@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>[hidden]{display:none!important}html,body{margin:0}img{max-width:100%}</style>
+<title>Awarie — panel administratora</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: narzędzie warsztatowe — pasek wczytywania plików, podsumowanie w chipach, tabela urządzeń, eksport. */
+:root{
+  --bg:#f3f5f6; --surface:#ffffff; --line:#d9dfe2; --fg:#16212a; --muted:#5b6a75;
+  --accent:#0b5d7a; --accent-fg:#ffffff; --accent-soft:#e1eef3;
+  --red:#c62828; --red-soft:#fbe4e4; --green:#2e8540; --green-soft:#e2f2e5;
+  --purple:#8e24aa; --purple-soft:#f3e3f7; --amber:#a86400;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f161b; --surface:#172129; --line:#2a3842; --fg:#e4ebef; --muted:#93a4b0;
+  --accent:#4fb3d6; --accent-fg:#06202b; --accent-soft:#163543;
+  --red:#ef6b6b; --red-soft:#3b1c1f; --green:#5cc173; --green-soft:#16301d;
+  --purple:#cf7ce6; --purple-soft:#33193b; --amber:#e3a64a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161b; --surface:#172129; --line:#2a3842; --fg:#e4ebef; --muted:#93a4b0;
+  --accent:#4fb3d6; --accent-fg:#06202b; --accent-soft:#163543;
+  --red:#ef6b6b; --red-soft:#3b1c1f; --green:#5cc173; --green-soft:#16301d;
+  --purple:#cf7ce6; --purple-soft:#33193b; --amber:#e3a64a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45}
+.wrap{max-width:1280px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+header h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted);max-width:70ch}
+.loaders{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.drop{background:var(--surface);border:1.5px dashed var(--line);border-radius:10px;padding:14px 16px;display:flex;gap:14px;align-items:center;cursor:pointer;transition:border-color .15s,background .15s;min-width:0}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+.drop .ico{flex:none;width:40px;height:40px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font:600 11px var(--f-mono)}
+.drop .txt{min-width:0}
+.drop b{display:block;font-weight:600}
+.drop small{display:block;color:var(--muted);overflow-wrap:anywhere}
+.drop .state{color:var(--fg);font-weight:500}
+.drop .clear{margin-left:auto;flex:none}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:5px 12px;font:500 13px var(--f-body);cursor:pointer;display:inline-flex;gap:7px;align-items:center;font-variant-numeric:tabular-nums}
+.chip:hover{border-color:var(--accent)}
+.chip:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.chip .n{font-family:var(--f-mono);font-size:12px;opacity:.8}
+.stats{display:flex;flex-wrap:wrap;gap:22px;align-items:baseline}
+.stat{display:flex;flex-direction:column}
+.stat .v{font:600 22px var(--f-mono);font-variant-numeric:tabular-nums}
+.stat .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.stat.red .v{color:var(--red)}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.tools .sp{flex:1}
+input[type=search],select{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+input[type=search]{min-width:0;width:220px;max-width:100%}
+label.chk{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+label.chk.off{opacity:.5;cursor:not-allowed}
+.btn{font:600 14px var(--f-body);border-radius:8px;padding:9px 16px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.sm{padding:4px 10px;font-size:12px}
+.msg{font-size:13px;color:var(--muted)}
+.msg.err{color:var(--red)}
+.tablebox{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:1120px}
+td:last-child{min-width:400px;width:38%}
+td:nth-child(2){max-width:220px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--surface)}
+tr:last-child td{border-bottom:0}
+td.code{font:600 14px var(--f-mono)}
+td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td .sub{color:var(--muted);font-size:12px}
+.pill{display:inline-block;border-radius:5px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.s3{background:var(--red-soft);color:var(--red)}
+.pill.s2{background:var(--green-soft);color:var(--green)}
+.pill.s1{background:var(--purple-soft);color:var(--purple)}
+.co{font-weight:600}
+.flag{display:block;margin-top:4px;font-size:11px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.04em}
+ul.f{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
+ul.f li{display:flex;gap:7px;align-items:baseline;font-size:13px}
+.dot{flex:none;width:9px;height:9px;border-radius:50%;transform:translateY(1px)}
+.dot.Czerwony{background:var(--red)}.dot.Zielony{background:var(--green)}.dot.Purpurowy{background:var(--purple)}.dot.x{background:var(--muted)}
+ul.f .d{color:var(--muted);font-family:var(--f-mono);font-size:12px;white-space:nowrap}
+.low{color:var(--red);font-weight:600}
+.empty{padding:36px;text-align:center;color:var(--muted)}
+details.help{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px}
+details.help summary{cursor:pointer;font-weight:600}
+details.help table{min-width:0}
+details.help td,details.help th{padding:5px 8px;font-size:13px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.pub{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.pub-main{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.pub-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pub-txt small{color:var(--muted);overflow-wrap:anywhere}
+.pub-txt a{color:var(--accent)}
+.pub-act{display:flex;gap:8px;flex-wrap:wrap}
+.pub .msg:empty{display:none}
+.pub-cfg{display:grid;grid-template-columns:2fr 1fr;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.pub-cfg label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+.pub-cfg input{font:inherit;font-size:14px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-width:0}
+.pub-cfg .wide{grid-column:1/-1}
+.pub-cfg-act{display:flex;gap:8px;flex-wrap:wrap}
+.msg.ok{color:var(--green)}
+@media (max-width:560px){.pub-cfg{grid-template-columns:1fr}}
+@media (max-width:560px){header h1{font-size:20px}.tools .sp{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Awarie parkometrów — panel administratora</h1>
+    <p>Wczytaj eksport „Status techniczny urządzeń” ze Smartfolio (CSV), sprawdź listę i kliknij „Opublikuj dla kontrolerów”. Kontrolerzy zobaczą dane pod stałym linkiem.</p>
+  </header>
+
+  <div class="loaders">
+    <label class="drop" id="dropCsv">
+      <input type="file" id="fileCsv" accept=".csv,.txt,text/csv">
+      <span class="ico">CSV</span>
+      <span class="txt"><b>1. Eksport ze Smartfolio</b><small id="csvState" class="state">Przeciągnij plik CSV lub kliknij</small></span>
+    </label>
+    <label class="drop" id="dropList">
+      <input type="file" id="fileList" accept=".xlsx">
+      <span class="ico">XLSX</span>
+      <span class="txt"><b>2. Lista parkometrów (opcjonalnie)</b><small id="listState">Plik AWARIE.xlsx — dodaje cost center, lokalizację i kontrolera. Zostaje zapamiętana w tej przeglądarce.</small></span>
+      <button type="button" class="btn ghost sm clear" id="clearList" hidden>Usuń</button>
+    </label>
+  </div>
+
+  <section class="pub" id="pub">
+    <div class="pub-main">
+      <div class="pub-txt">
+        <b>Strona kontrolera</b>
+        <small id="pubLink">Najpierw uzupełnij ustawienia publikacji.</small>
+        <small id="pubLast"></small>
+      </div>
+      <div class="pub-act">
+        <button type="button" class="btn ghost sm" id="pubCfgBtn" aria-expanded="false" aria-controls="pubCfg">Ustawienia</button>
+        <button type="button" class="btn" id="pubBtn" disabled>Opublikuj dla kontrolerów</button>
+      </div>
+    </div>
+    <p class="msg" id="pubMsg" role="status"></p>
+    <form class="pub-cfg" id="pubCfg" hidden>
+      <label for="ghRepo">Repozytorium (login/nazwa)<input id="ghRepo" placeholder="np. arek-apcoa/awarie" autocomplete="off" spellcheck="false"></label>
+      <label for="ghBranch">Gałąź<input id="ghBranch" value="main" autocomplete="off" spellcheck="false"></label>
+      <label for="ghToken" class="wide">Token GitHub (zostaje tylko w tej przeglądarce)<input id="ghToken" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false"></label>
+      <div class="wide pub-cfg-act">
+        <button type="submit" class="btn sm">Zapisz i sprawdź połączenie</button>
+        <button type="button" class="btn ghost sm" id="ghForget">Usuń token z tej przeglądarki</button>
+      </div>
+    </form>
+  </section>
+
+  <div class="stats" id="stats"></div>
+  <div class="bar" id="cats" role="group" aria-label="Filtr rodzaju awarii"></div>
+
+  <div class="tools">
+    <input type="search" id="q" placeholder="Szukaj: kod, adres, kontroler…" aria-label="Szukaj">
+    <label class="chk" id="onlyListLbl"><input type="checkbox" id="onlyList"> tylko parkometry z listy</label>
+    <label class="chk">Okres
+      <select id="period">
+        <option value="24">ostatnia doba</option>
+        <option value="72" selected>ostatnie 3 dni</option>
+        <option value="168">ostatnie 7 dni</option>
+        <option value="">wszystkie</option>
+      </select>
+    </label>
+    <label class="chk"><input type="checkbox" id="onlyRed"> tylko awarie (czerwone)</label>
+    <label class="chk">Sortuj
+      <select id="sort">
+        <option value="sev">pilność</option>
+        <option value="ctrl">kontroler</option>
+        <option value="loc">lokalizacja</option>
+        <option value="code">kod parkometru</option>
+        <option value="new">najnowsze</option>
+      </select>
+    </label>
+    <span class="sp"></span>
+    <span class="msg" id="dlMsg"></span>
+    <button class="btn ghost" id="dlView" disabled>Plik dla kontrolerów (offline)</button>
+    <button class="btn" id="dl" disabled>Pobierz Excel</button>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot Czerwony"></i>Czerwony — defekt, funkcja nie działa</span>
+    <span><i class="dot Zielony"></i>Zielony — błąd / ostrzeżenie</span>
+    <span><i class="dot Purpurowy"></i>Purpurowy — komunikacja</span>
+  </div>
+
+  <div class="tablebox"><table>
+    <thead><tr><th>Parkometr</th><th>Lokalizacja</th><th>Kontroler</th><th>Co</th><th>Status</th><th>Bilety</th><th>Akum.</th><th>Awarie</th></tr></thead>
+    <tbody id="tb"><tr><td colspan="8" class="empty">Wczytaj plik CSV.</td></tr></tbody>
+  </table></div>
+
+  <details class="help">
+    <summary>Jak narzędzie przypisuje kategorię „co”</summary>
+    <table>
+      <tr><th>Podzespół / komunikat w Smartfolio</th><th>Kategoria</th></tr>
+      <tr><td>Drukarka — brak papieru, limit papieru</td><td>papier</td></tr>
+      <tr><td>Drukarka — inne (np. błąd komunikacji z drukarką)</td><td>drukarka</td></tr>
+      <tr><td>Akumulator — napięcie robocze/spoczynkowe</td><td>akumulator (w połączeniu: aku)</td></tr>
+      <tr><td>Czytnik kart</td><td>czytnik kart</td></tr>
+      <tr><td>Selektor monet</td><td>monety</td></tr>
+      <tr><td>Obudowa — otwarcie drzwi</td><td>drzwi</td></tr>
+      <tr><td>Modem i sieć, brak sygnału kontrolnego</td><td>komunikacja</td></tr>
+      <tr><td>Płyta główna — brak obsługiwanych metod płatności</td><td>znacznik „nie przyjmuje płatności”</td></tr>
+      <tr><td>Wszystko inne</td><td>do weryfikacji</td></tr>
+    </table>
+    <p class="msg">Excel ma trzy arkusze: <b>awarie</b> (jeden wiersz na parkometr), <b>szczegóły</b> (jeden wiersz na komunikat) i <b>aktualne</b> (kod + kategoria, w układzie starego pliku AWARIE, więc działa z dotychczasowym WYSZUKAJ.PIONOWO).</p>
+  </details>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script>
+const SAMPLE = null;
+const SAMPLE_NAME = "";
+const LS_KEY = "awarie.lista.v1";
+
+const $ = s => document.querySelector(s);
+const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ł/g,"l").replace(/Ł/g,"L").toLowerCase().trim();
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- dekodowanie pliku ---------- */
+function decodeBytes(buf){
+  const b = new Uint8Array(buf);
+  if (b[0]===0xFF && b[1]===0xFE) return new TextDecoder("utf-16le").decode(b.subarray(2));
+  if (b[0]===0xFE && b[1]===0xFF) return new TextDecoder("utf-16be").decode(b.subarray(2));
+  // UTF-16 bez BOM: dużo zer na nieparzystych pozycjach
+  let z=0, n=Math.min(b.length,4000);
+  for (let i=1;i<n;i+=2) if (b[i]===0) z++;
+  if (z > n/4) return new TextDecoder("utf-16le").decode(b);
+  let t;
+  try { t = new TextDecoder("utf-8",{fatal:true}).decode(b); }
+  catch(e){ return new TextDecoder("windows-1250").decode(b); }
+  return repairStripped(t);
+}
+// Plik UTF-16 z wyciętymi bajtami zerowymi: polskie litery zostają jako para (niski bajt, 0x01), „ó” jako znak zastępczy.
+function repairStripped(t){
+  const pairs = (t.match(/[\x00-\xff]\x01/g) || []).length;
+  if (pairs < 3) return t.replace(/^﻿/,"");
+  return t.replace(/([\x00-\xff])\x01/g, (m,c) => String.fromCharCode(0x100 + c.charCodeAt(0)))
+          .replace(/^\uFFFD+/,"").replace(/\uFFFD/g,"ó");
+}
+
+/* ---------- CSV ---------- */
+function parseCSV(text){
+  const first = text.slice(0, text.search(/\r?\n/) >>> 0 || 2000);
+  const cnt = ch => first.split(ch).length;
+  const sep = [",",";","\t"].sort((a,b)=>cnt(b)-cnt(a))[0];
+  const rows=[]; let row=[], f="", q=false;
+  for (let i=0;i<text.length;i++){
+    const c=text[i];
+    if (q){
+      if (c==='"'){ if (text[i+1]==='"'){ f+='"'; i++; } else q=false; }
+      else f+=c;
+    } else if (c==='"') q=true;
+    else if (c===sep){ row.push(f); f=""; }
+    else if (c==="\n" || c==="\r"){
+      if (c==="\r" && text[i+1]==="\n") i++;
+      row.push(f); f=""; if (row.some(x=>x!=="")) rows.push(row); row=[];
+    } else f+=c;
+  }
+  row.push(f); if (row.some(x=>x!=="")) rows.push(row);
+  return rows;
+}
+
+const COLS = {
+  code:["kod parkomatu","kod parkometru","parkomat"], batt:["akumulator"], tickets:["ilosc biletow"],
+  lastComm:["data ostatniej komunikacji"], color:["kod kategorii"], start:["data i czas rozpoczecia"],
+  status:["status"], part:["podzespol"], dur:["czas trwania"], zone:["opis strefy"], circuit:["opis obwodu"],
+  addr:["adres"], gsm:["sila sygnalu"]
+};
+const FALLBACK_IDX = {code:0,batt:1,tickets:2,lastComm:3,color:4,start:5,status:6,part:7,dur:8,zone:9,circuit:10,addr:11,gsm:13};
+
+function mapHeader(h){
+  const H = h.map(norm), idx={};
+  for (const [k,names] of Object.entries(COLS)){
+    let i = H.findIndex(x => names.some(n => k==="status" ? x===n : x.startsWith(n)));
+    idx[k] = i>=0 ? i : FALLBACK_IDX[k];
+  }
+  return idx;
+}
+
+/* daty: kolumna może być DD/MM albo MM/DD — rozpoznajemy po wartościach > 12 */
+function dateOrder(values, dflt){
+  let dm=false, md=false;
+  for (const v of values){ const m=/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/.exec(v); if(!m) continue;
+    if (+m[1]>12) dm=true; if (+m[2]>12) md=true; }
+  if (dm && !md) return "DMY"; if (md && !dm) return "MDY"; return dflt;
+}
+function parseDate(v, order){
+  const m=/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(String(v).trim());
+  if (!m) return null;
+  const [d,mo] = order==="MDY" ? [+m[2],+m[1]] : [+m[1],+m[2]];
+  return {y:+m[3],mo,d,h:+(m[4]||0),mi:+(m[5]||0),s:+(m[6]||0)};
+}
+const p2 = n => String(n).padStart(2,"0");
+const fmtDate = (t,withTime=true) => t ? `${p2(t.d)}.${p2(t.mo)}.${t.y}` + (withTime?` ${p2(t.h)}:${p2(t.mi)}`:"") : "";
+const toXlDate = t => t ? new Date(Date.UTC(t.y,t.mo-1,t.d,t.h,t.mi,t.s)) : null;
+const hoursOf = v => { const m=/^(\d+):(\d{2})(?::(\d{2}))?/.exec(String(v).trim()); return m ? +m[1] + +m[2]/60 + +(m[3]||0)/3600 : null; };
+const num = v => { const x=parseFloat(String(v).replace(",",".").replace(/[^\d.\-]/g,"")); return isNaN(x)?null:x; };
+
+/* ---------- kategorie ---------- */
+const CAT_ORDER = ["akumulator","papier","drukarka","czytnik kart","monety","drzwi","komunikacja","do weryfikacji"];
+function categorize(status, part){
+  const s=norm(status), p=norm(part);
+  if (s.includes("brak obslugiwanych metod platnosci")) return null; // skutek innej awarii
+  if (p.includes("drukark") || s.includes("drukark")) return s.includes("papier") ? "papier" : "drukarka";
+  if (p.includes("akumul") || s.includes("napiecie")) return "akumulator";
+  if (p.includes("czytnik") || s.includes("czytnik") || s.includes("karta")) return "czytnik kart";
+  if (p.includes("selektor") || s.includes("monet")) return "monety";
+  if (p.includes("obudowa") || s.includes("drzwi")) return "drzwi";
+  if (p.includes("modem") || p.includes("peryfer") || s.includes("komunikac") || s.includes("sygnalu")) return "komunikacja";
+  return "do weryfikacji";
+}
+function coLabel(cats){
+  const list = CAT_ORDER.filter(c => cats.has(c));
+  if (!list.length) return "do weryfikacji";
+  return list.map(c => c==="akumulator" && list.length>1 ? "aku" : c).join("/");
+}
+const SEV_NAME = {3:"Awaria",2:"Błąd",1:"Komunikacja",0:"—"};
+
+/* ---------- budowa danych ---------- */
+let exportAt=null; // moment eksportu = start komunikatu + czas trwania
+function buildDevices(rows){
+  const idx = mapHeader(rows[0]);
+  const body = rows.slice(1).filter(r => (r[idx.code]||"").trim());
+  const startOrder = dateOrder(body.flatMap(r => (r[idx.start]||"").split(/\r?\n/)), "MDY");
+  const commOrder = dateOrder(body.map(r => r[idx.lastComm]||""), "DMY");
+  const split = (r,k) => (r[idx[k]]||"").split(/\r?\n/).map(x=>x.trim());
+  exportAt=null;
+  const out = body.map(r => {
+    const colors=split(r,"color"), starts=split(r,"start"), sts=split(r,"status"), parts=split(r,"part"), durs=split(r,"dur");
+    const n=Math.max(colors.length, sts.length);
+    const faults=[];
+    for (let i=0;i<n;i++){
+      if (!sts[i] && !colors[i]) continue;
+      const h = hoursOf(durs[i]||"");
+      faults.push({color:colors[i]||"", start:parseDate(starts[i]||"",startOrder), status:sts[i]||"", part:parts[i]||"",
+        hours:h, days:h==null?null:Math.floor(h/24), cat:categorize(sts[i],parts[i])});
+    }
+    const cats=new Set(faults.map(f=>f.cat).filter(Boolean));
+    const sev = faults.some(f=>f.color==="Czerwony")?3 : faults.some(f=>f.color==="Zielony")?2 : faults.length?1:0;
+    return {
+      code:(r[idx.code]||"").trim(), batt:num(r[idx.batt]), tickets:num(r[idx.tickets]),
+      lastComm:parseDate(r[idx.lastComm]||"",commOrder), zone:r[idx.zone]||"", circuit:r[idx.circuit]||"", addr:r[idx.addr]||"",
+      faults, cats, co: faults.length ? coLabel(cats) : "", sev,
+      noPay: faults.some(f => norm(f.status).includes("brak obslugiwanych metod platnosci")),
+      minHours: faults.reduce((m,f)=>Math.min(m,f.hours??1e9),1e9)
+    };
+  });
+  // moment eksportu: najczęstsza wartość (start + czas trwania) z dokładnością do minuty — pojedyncze wpisy w Smartfolio mają błędne daty;
+  // rezerwowo najpóźniejsza „ostatnia komunikacja”
+  const votes=new Map();
+  for (const d of out) for (const f of d.faults) if (f.start && f.hours!=null){
+    const ms = Math.floor((Date.UTC(f.start.y,f.start.mo-1,f.start.d,f.start.h,f.start.mi,f.start.s) + f.hours*3600e3)/60000)*60000;
+    votes.set(ms,(votes.get(ms)||0)+1);
+  }
+  let bestN=0; for (const [ms,n] of votes) if (n>bestN || (n===bestN && ms>exportAt)){ bestN=n; exportAt=ms; }
+  if (!exportAt) for (const d of out) if (d.lastComm){ const ms=toXlDate(d.lastComm).getTime(); if (!exportAt || ms>exportAt) exportAt=ms; }
+  return out;
+}
+
+/* ---------- lista parkometrów (AWARIE.xlsx) ---------- */
+let master = null; // {name, loaded, map:{code:{cc,loc,ctrl}}}
+function cellVal(c){
+  let v=c?.value;
+  if (v && typeof v==="object"){
+    if ("result" in v) v=v.result; else if ("richText" in v) v=v.richText.map(x=>x.text).join(""); else if ("text" in v) v=v.text; else v=null;
+    if (v && typeof v==="object") v=null; // błędy formuł (#REF!)
+  }
+  if (typeof v==="string" && (v.startsWith("#") || v.startsWith("="))) v=null;
+  return v==null ? "" : String(v).trim();
+}
+async function readMaster(buf, name){
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buf);
+  let best=null;
+  wb.eachSheet(ws => {
+    if (best) return;
+    for (let r=1;r<=Math.min(5,ws.rowCount);r++){
+      const hdr=[]; ws.getRow(r).eachCell({includeEmpty:true},(c,i)=>hdr[i]=norm(cellVal(c)));
+      const iCode=hdr.findIndex(h=>h && (h.startsWith("parkometr")||h.startsWith("parkomat")||h==="kod"));
+      if (iCode>0){ best={ws,r,hdr,iCode}; return; }
+    }
+  });
+  if (!best) throw new Error("Nie znalazłem arkusza z kolumną „Parkometr”.");
+  const {ws,r,hdr,iCode}=best;
+  const find = (...keys) => hdr.findIndex(h=>h && keys.some(k=>h.startsWith(k)));
+  const iCC=find("cost center","cc","mpk"), iLoc=find("lokalizacja","nazwa","adres"), iCtrl=find("glowny","kontroler");
+  const map={};
+  for (let i=r+1;i<=ws.rowCount;i++){
+    const row=ws.getRow(i), code=cellVal(row.getCell(iCode)).replace(/\.0$/,"");
+    if (!code) continue;
+    map[code]={cc: iCC>0?cellVal(row.getCell(iCC)):"", loc: iLoc>0?cellVal(row.getCell(iLoc)):"", ctrl: iCtrl>0?cellVal(row.getCell(iCtrl)):""};
+  }
+  return {name, loaded:new Date().toISOString().slice(0,10), map};
+}
+
+/* ---------- stan i widok ---------- */
+let devices=[], csvName="", catFilter=null;
+/* okres: zostają tylko komunikaty, które trwają krócej niż wybrany okres (czas trwania liczony do chwili eksportu) */
+function win(d){
+  const lim=$("#period").value; if (!lim) return d;
+  const faults=d.faults.filter(f=>f.hours!=null && f.hours<=+lim);
+  if (faults.length===d.faults.length) return d;
+  const cats=new Set(faults.map(f=>f.cat).filter(Boolean));
+  return {...d, faults, cats, co: faults.length?coLabel(cats):"",
+    sev: faults.some(f=>f.color==="Czerwony")?3 : faults.some(f=>f.color==="Zielony")?2 : faults.length?1:0,
+    noPay: faults.some(f=>norm(f.status).includes("brak obslugiwanych metod platnosci")),
+    minHours: faults.reduce((m,f)=>Math.min(m,f.hours??1e9),1e9)};
+}
+const active = () => devices.map(win).filter(d=>d.faults.length);
+function enrich(d){ const m=master?.map[d.code]; return {cc:m?.cc||"", loc:m?.loc||"", ctrl:m?.ctrl||"", inList:!!m}; }
+
+function visible(){
+  const q=norm($("#q").value), onlyList=$("#onlyList").checked && master, onlyRed=$("#onlyRed").checked;
+  let list = active().map(d=>({...d,...enrich(d)}));
+  if (onlyList) list=list.filter(d=>d.inList);
+  if (onlyRed) list=list.filter(d=>d.sev===3);
+  if (catFilter) list=list.filter(d=>d.cats.has(catFilter));
+  if (q) list=list.filter(d=>norm([d.code,d.addr,d.loc,d.ctrl,d.co,d.circuit,d.cc].join(" ")).includes(q));
+  const s=$("#sort").value, cmp=(a,b)=>String(a).localeCompare(String(b),"pl",{numeric:true});
+  const by = {
+    sev:(a,b)=>b.sev-a.sev || b.noPay-a.noPay || a.minHours-b.minHours,
+    ctrl:(a,b)=>cmp(a.ctrl||"￿",b.ctrl||"￿") || cmp(a.loc||a.addr,b.loc||b.addr) || cmp(a.code,b.code),
+    loc:(a,b)=>cmp(a.loc||a.addr,b.loc||b.addr) || cmp(a.code,b.code),
+    code:(a,b)=>cmp(a.code,b.code),
+    new:(a,b)=>a.minHours-b.minHours
+  }[s];
+  return list.sort(by);
+}
+
+function renderStats(){
+  const base = active().filter(d=>(!($("#onlyList").checked && master) || master.map[d.code]));
+  const red=base.filter(d=>d.sev===3).length, nopay=base.filter(d=>d.noPay).length;
+  $("#stats").innerHTML = [
+    ["v",devices.length,"parkometrów w pliku"],["v",base.length,"z komunikatem w okresie"],
+    ["red",red,"awarie (czerwone)"],["red",nopay,"nie przyjmuje płatności"]
+  ].map(([c,v,l])=>`<div class="stat ${c}"><span class="v">${v}</span><span class="l">${l}</span></div>`).join("");
+  const counts={}; base.forEach(d=>d.cats.forEach(c=>counts[c]=(counts[c]||0)+1));
+  $("#cats").innerHTML = `<button class="chip" data-cat="" aria-pressed="${!catFilter}">wszystkie <span class="n">${base.length}</span></button>` +
+    CAT_ORDER.filter(c=>counts[c]).map(c=>`<button class="chip" data-cat="${c}" aria-pressed="${catFilter===c}">${c} <span class="n">${counts[c]}</span></button>`).join("");
+}
+
+function render(){
+  renderStats();
+  const list=visible();
+  $("#dl").disabled = !list.length; $("#dlView").disabled = !list.length; renderPub();
+  if (!devices.length){ $("#tb").innerHTML=`<tr><td colspan="8" class="empty">Wczytaj plik CSV.</td></tr>`; return; }
+  if (!list.length){ $("#tb").innerHTML=`<tr><td colspan="8" class="empty">Brak parkometrów dla wybranych filtrów.</td></tr>`; return; }
+  $("#tb").innerHTML = list.map(d=>`<tr>
+    <td class="code">${esc(d.code)}${d.cc?`<div class="sub">CC ${esc(d.cc)}</div>`:""}</td>
+    <td>${esc(d.loc||d.addr)}${d.loc&&d.addr?`<div class="sub">${esc(d.addr)}</div>`:""}${d.circuit?`<div class="sub">${esc(d.circuit)}</div>`:""}</td>
+    <td>${esc(d.ctrl)||'<span class="sub">—</span>'}</td>
+    <td><span class="co">${esc(d.co)}</span>${d.noPay?'<span class="flag">nie przyjmuje płatności</span>':""}</td>
+    <td><span class="pill s${d.sev}">${SEV_NAME[d.sev]}</span></td>
+    <td class="num ${d.tickets===0?"low":""}">${d.tickets??""}</td>
+    <td class="num ${d.batt!=null&&d.batt<11.5?"low":""}">${d.batt!=null?d.batt.toFixed(2)+" V":""}</td>
+    <td><ul class="f">${d.faults.map(f=>`<li><i class="dot ${esc(f.color)||"x"}"></i><span>${esc(f.status)}</span><span class="d">${f.start?fmtDate(f.start,false):""}${f.days!=null?` · ${f.days} d`:""}</span></li>`).join("")}</ul></td>
+  </tr>`).join("");
+}
+
+/* ---------- Excel ---------- */
+const FILL = {3:"FFF8D7D7",2:"FFDDF0E0",1:"FFF1DDF6"};
+const COLOR_FILL = {Czerwony:"FFF8D7D7",Zielony:"FFDDF0E0",Purpurowy:"FFF1DDF6"};
+function styleHeader(ws){
+  const r=ws.getRow(1); r.font={bold:true,color:{argb:"FFFFFFFF"}}; r.alignment={vertical:"middle",wrapText:true}; r.height=30;
+  r.eachCell(c=>c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF0B5D7A"}});
+  ws.views=[{state:"frozen",ySplit:1}];
+  ws.autoFilter={from:{row:1,column:1},to:{row:1,column:ws.columnCount}};
+}
+async function buildWorkbook(list){
+  const wb=new ExcelJS.Workbook(); wb.creator="Awarie parkometrów"; wb.created=new Date();
+  const hasList=!!master;
+  const ws=wb.addWorksheet("awarie");
+  ws.columns=[
+    {header:"Parkometr",key:"code",width:11},
+    ...(hasList?[{header:"Cost center",key:"cc",width:11},{header:"Lokalizacja",key:"loc",width:34},{header:"Kontroler",key:"ctrl",width:20}]:[]),
+    {header:"co",key:"co",width:18},{header:"Status",key:"sev",width:13},{header:"Nie przyjmuje płatności",key:"noPay",width:13},
+    {header:"Bilety",key:"tickets",width:8},{header:"Akumulator [V]",key:"batt",width:11},
+    {header:"Szczegóły",key:"det",width:70},
+    {header:"Adres (Smartfolio)",key:"addr",width:38},{header:"Obwód",key:"circuit",width:16}
+  ];
+  for (const d of list){
+    const row=ws.addRow({code:/^\d+$/.test(d.code)?+d.code:d.code, cc:d.cc?(isNaN(+d.cc)?d.cc:+d.cc):"", loc:d.loc, ctrl:d.ctrl, co:d.co, sev:SEV_NAME[d.sev],
+      noPay:d.noPay?"TAK":"", tickets:d.tickets, batt:d.batt,
+      det:d.faults.map(f=>`• ${f.status}${f.start?` — od ${fmtDate(f.start)}`:""}${f.days!=null?` (${f.days} d)`:""}`).join("\n"),
+      addr:d.addr, circuit:d.circuit});
+    row.alignment={vertical:"top",wrapText:true};
+    row.getCell("sev").fill={type:"pattern",pattern:"solid",fgColor:{argb:FILL[d.sev]}};
+    row.getCell("co").font={bold:true};
+    if (d.noPay) row.getCell("noPay").font={bold:true,color:{argb:"FFC62828"}};
+    row.getCell("batt").numFmt="0.00";
+  }
+  styleHeader(ws);
+
+  const ws2=wb.addWorksheet("szczegóły");
+  ws2.columns=[
+    {header:"Parkometr",key:"code",width:11},
+    ...(hasList?[{header:"Lokalizacja",key:"loc",width:34},{header:"Kontroler",key:"ctrl",width:20}]:[]),
+    {header:"Kolor",key:"color",width:11},{header:"Kategoria",key:"cat",width:15},{header:"Komunikat",key:"status",width:60},
+    {header:"Podzespół",key:"part",width:22},{header:"Od",key:"start",width:17},{header:"Czas trwania [h]",key:"hours",width:11},
+    {header:"Dni",key:"days",width:7},{header:"Adres (Smartfolio)",key:"addr",width:38}
+  ];
+  for (const d of list) for (const f of d.faults){
+    const row=ws2.addRow({code:/^\d+$/.test(d.code)?+d.code:d.code, loc:d.loc, ctrl:d.ctrl, color:f.color, cat:f.cat||"płatności (skutek)",
+      status:f.status, part:f.part, start:toXlDate(f.start), hours:f.hours!=null?Math.round(f.hours*10)/10:null, days:f.days, addr:d.addr});
+    if (COLOR_FILL[f.color]) row.getCell("color").fill={type:"pattern",pattern:"solid",fgColor:{argb:COLOR_FILL[f.color]}};
+    row.getCell("start").numFmt="dd.mm.yyyy hh:mm";
+  }
+  styleHeader(ws2);
+
+  const ws3=wb.addWorksheet("aktualne");
+  ws3.columns=[{header:"Parkometr",key:"code",width:11},{header:"co",key:"co",width:20}];
+  for (const d of list) ws3.addRow({code:/^\d+$/.test(d.code)?+d.code:d.code, co:d.co});
+  styleHeader(ws3);
+  return wb.xlsx.writeBuffer();
+}
+
+/* ---------- widok dla kontrolerów (samodzielny plik HTML na telefon) ---------- */
+const VIEW_TPL = "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,viewport-fit=cover\">\n<title>Awarie parkometrów<\/title>\n<style>\n:root{\n  --bg:#f3f5f6; --surface:#ffffff; --line:#d9dfe2; --fg:#16212a; --muted:#5b6a75;\n  --accent:#0b5d7a; --accent-fg:#ffffff;\n  --red:#c62828; --red-soft:#fbe4e4; --green:#2e8540; --green-soft:#e2f2e5; --purple:#8e24aa; --purple-soft:#f3e3f7;\n  color-scheme:light;\n}\n@media (prefers-color-scheme: dark){:root{\n  --bg:#0f161b; --surface:#172129; --line:#2a3842; --fg:#e4ebef; --muted:#93a4b0;\n  --accent:#4fb3d6; --accent-fg:#06202b;\n  --red:#ef6b6b; --red-soft:#3b1c1f; --green:#5cc173; --green-soft:#16301d; --purple:#cf7ce6; --purple-soft:#33193b;\n  color-scheme:dark}}\n*{box-sizing:border-box}\nhtml{-webkit-text-size-adjust:100%}\nbody{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,\"Segoe UI\",Roboto,sans-serif}\n.top{position:sticky;top:0;z-index:5;background:var(--accent);color:var(--accent-fg);\n  padding:calc(10px + env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) 10px max(14px,env(safe-area-inset-left,0px));\n  display:flex;flex-direction:column;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.15)}\n.top h1{margin:0;font-size:17px;font-weight:700;display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}\n.top h1 small{font-weight:500;font-size:12px;opacity:.85}\n.row{display:flex;gap:8px}\nselect,input{font:inherit;font-size:16px;color:var(--fg);background:var(--surface);border:0;border-radius:8px;padding:8px 10px;min-width:0}\nselect{flex:1.3}\ninput{flex:1}\nmain{padding:12px max(12px,env(safe-area-inset-right,0px)) calc(28px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px;max-width:760px;margin:0 auto}\n.sum{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}\n.sum b{color:var(--fg);font-size:15px}\n.sum .r b{color:var(--red)}\n.group{display:flex;flex-direction:column;gap:8px}\n.group h2{margin:4px 2px 0;font-size:14px;font-weight:700}\n.group h2 span{display:block;font-weight:400;font-size:12px;color:var(--muted)}\n.card{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--green);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}\n.card.s3{border-left-color:var(--red)} .card.s1{border-left-color:var(--purple)}\n.head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}\n.code{font:700 18px ui-monospace,Menlo,Consolas,monospace}\n.pill{border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700}\n.pill.s3{background:var(--red-soft);color:var(--red)} .pill.s2{background:var(--green-soft);color:var(--green)} .pill.s1{background:var(--purple-soft);color:var(--purple)}\n.co{font-size:16px;font-weight:700}\n.nopay{font-size:12px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.03em}\n.meta{font-size:13px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}\n.meta .low{color:var(--red);font-weight:700}\nul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);padding-top:6px}\nli{display:flex;gap:8px;font-size:13.5px}\nli .d{margin-left:auto;color:var(--muted);white-space:nowrap;font-size:12px;padding-left:6px}\n.dot{flex:none;width:9px;height:9px;border-radius:50%;margin-top:6px;background:var(--muted)}\n.dot.Czerwony{background:var(--red)} .dot.Zielony{background:var(--green)} .dot.Purpurowy{background:var(--purple)}\n.empty{text-align:center;color:var(--muted);padding:40px 10px}\n.foot{font-size:12px;color:var(--muted);text-align:center}\n<\/style>\n<\/head>\n<body>\n<header class=\"top\">\n  <h1>Awarie parkometrów <small id=\"when\"><\/small><\/h1>\n  <div class=\"row\">\n    <select id=\"who\" aria-label=\"Kontroler\"><\/select>\n    <input type=\"search\" id=\"q\" placeholder=\"Szukaj kodu, adresu\" aria-label=\"Szukaj\">\n  <\/div>\n<\/header>\n<main>\n  <div class=\"sum\" id=\"sum\"><\/div>\n  <div id=\"list\"><\/div>\n  <p class=\"foot\" id=\"foot\"><\/p>\n<\/main>\n<script>\nconst DATA = __DATA__;\nconst SEV = {3:\"Awaria\",2:\"Błąd\",1:\"Komunikacja\"};\nconst esc = s => String(s ?? \"\").replace(/[&<>\"]/g, c => ({\"&\":\"&amp;\",\"<\":\"&lt;\",\">\":\"&gt;\",'\"':\"&quot;\"}[c]));\nconst norm = s => String(s ?? \"\").normalize(\"NFD\").replace(/[̀-ͯ]/g,\"\").replace(/ł/g,\"l\").toLowerCase();\nconst NONE = \"— bez przypisanego kontrolera —\";\nconst who = document.getElementById(\"who\"), q = document.getElementById(\"q\");\n\ndocument.getElementById(\"when\").textContent = \"stan na \" + DATA.exportAt;\ndocument.getElementById(\"foot\").textContent = \"Okres: \" + DATA.period + \". Plik wygenerowany \" + DATA.generated + \".\";\n\nconst ctrls = [...new Set(DATA.items.map(d => d.ctrl || NONE))].sort((a,b)=>a===NONE?1:b===NONE?-1:a.localeCompare(b,\"pl\"));\nconst showCtrl = DATA.hasCtrl && ctrls.length > 1;\nif (showCtrl){\n  who.innerHTML = `<option value=\"\">Wszyscy (${DATA.items.length})<\/option>` +\n    ctrls.map(c => `<option value=\"${esc(c)}\">${esc(c)} (${DATA.items.filter(d=>(d.ctrl||NONE)===c).length})<\/option>`).join(\"\");\n  try { const s = localStorage.getItem(\"awarie.kontroler\"); if (s && ctrls.includes(s)) who.value = s; } catch(e){}\n} else who.hidden = true;\n\nfunction render(){\n  const c = who.value, t = norm(q.value.trim());\n  let items = DATA.items.filter(d => !c || (d.ctrl||NONE) === c);\n  if (t) items = items.filter(d => norm([d.code,d.loc,d.addr,d.co].join(\" \")).includes(t));\n  const red = items.filter(d=>d.sev===3).length, np = items.filter(d=>d.noPay).length;\n  document.getElementById(\"sum\").innerHTML =\n    `<span><b>${items.length}<\/b> parkometrów<\/span><span class=\"r\"><b>${red}<\/b> awarie<\/span><span class=\"r\"><b>${np}<\/b> nie przyjmuje płatności<\/span>`;\n  if (!items.length){ document.getElementById(\"list\").innerHTML = `<p class=\"empty\">Brak awarii do pokazania.<\/p>`; return; }\n  const groups = new Map();\n  for (const d of items){ const k = d.loc || d.addr || \"—\"; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(d); }\n  const order = [...groups.entries()].sort((a,b) => Math.max(...b[1].map(d=>d.sev)) - Math.max(...a[1].map(d=>d.sev)) || a[0].localeCompare(b[0],\"pl\"));\n  document.getElementById(\"list\").innerHTML = order.map(([loc, ds]) => `\n    <section class=\"group\">\n      <h2>${esc(loc)}${ds[0].loc && ds[0].addr ? `<span>${esc(ds[0].addr)}<\/span>` : \"\"}<\/h2>\n      ${ds.sort((a,b)=>b.sev-a.sev).map(d => `\n      <article class=\"card s${d.sev}\">\n        <div class=\"head\"><span class=\"code\">${esc(d.code)}<\/span><span class=\"pill s${d.sev}\">${SEV[d.sev]||\"\"}<\/span><\/div>\n        <div><div class=\"co\">${esc(d.co)}<\/div>${d.noPay ? `<div class=\"nopay\">Nie przyjmuje płatności<\/div>` : \"\"}<\/div>\n        <div class=\"meta\">\n          ${d.tickets!=null ? `<span class=\"${d.tickets===0?\"low\":\"\"}\">Bilety: ${d.tickets}<\/span>` : \"\"}\n          ${d.batt!=null ? `<span class=\"${d.batt<11.5?\"low\":\"\"}\">Akumulator: ${d.batt.toFixed(2)} V<\/span>` : \"\"}\n          ${!c && d.ctrl ? `<span>${esc(d.ctrl)}<\/span>` : \"\"}\n        <\/div>\n        <ul>${d.faults.map(f => `<li><i class=\"dot ${esc(f.color)}\"><\/i><span>${esc(f.status)}<\/span><span class=\"d\">${esc(f.start)}<\/span><\/li>`).join(\"\")}<\/ul>\n      <\/article>`).join(\"\")}\n    <\/section>`).join(\"\");\n}\nwho.addEventListener(\"change\", () => { try { localStorage.setItem(\"awarie.kontroler\", who.value); } catch(e){} render(); });\nq.addEventListener(\"input\", render);\nrender();\n<\/script>\n<\/body>\n<\/html>\n";
+function fmtUTC(ms){ const d=new Date(ms); return `${p2(d.getUTCDate())}.${p2(d.getUTCMonth()+1)}.${d.getUTCFullYear()} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`; }
+function buildViewHtml(list){
+  const n=new Date();
+  const _unused={
+    exportAt: exportAt ? fmtUTC(exportAt) : "—",
+    generated: `${p2(n.getDate())}.${p2(n.getMonth()+1)}.${n.getFullYear()} ${p2(n.getHours())}:${p2(n.getMinutes())}`,
+    period: $("#period").selectedOptions[0].textContent.trim(),
+    hasCtrl: !!master,
+    items: list.map(d=>({code:d.code, loc:d.loc, addr:d.addr, ctrl:d.ctrl, co:d.co, sev:d.sev, noPay:d.noPay, tickets:d.tickets, batt:d.batt,
+      faults:d.faults.map(f=>({color:f.color, status:f.status, start:f.start?`${p2(f.start.d)}.${p2(f.start.mo)} ${p2(f.start.h)}:${p2(f.start.mi)}`:""}))}))
+  };
+  const data=viewData(list);
+  const json=JSON.stringify(data).replace(/</g,"\\u003c");
+  return VIEW_TPL.replace("__DATA__", () => json);
+}
+async function saveFile(fname, data, label, count){
+  const msg=$("#dlMsg");
+  const dl=await getDownloads();
+  if (dl){
+    try{ await dl.save({filename:fname,data}); msg.textContent=`Zapisano ${fname} (${count} parkometrów).`; }
+    catch(e){ msg.textContent = e?.code==="declined" ? "Zapis anulowany." : e?.code==="rate_limited" ? "Okno zapisu jest już otwarte." : "Nie udało się zapisać pliku: "+(e?.message||e?.code||e); if(e?.code!=="declined") msg.className="msg err"; }
+  } else {
+    const a=document.createElement("a"); a.href=URL.createObjectURL(data instanceof Blob?data:new Blob([data])); a.download=fname; document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000);
+    msg.textContent=`Pobrano ${fname} (${count} parkometrów).`;
+  }
+}
+async function doView(){
+  const msg=$("#dlMsg"); msg.className="msg"; msg.textContent="Przygotowuję…";
+  try{
+    const list=visible(), t=new Date();
+    const fname=`awarie_kontrolerzy_${t.getFullYear()}-${p2(t.getMonth()+1)}-${p2(t.getDate())}.html`;
+    await saveFile(fname, new Blob([buildViewHtml(list)],{type:"text/html"}), "widok", list.length);
+  }catch(e){ msg.className="msg err"; msg.textContent="Błąd przy tworzeniu widoku: "+(e?.message||e); }
+}
+
+/* ---------- publikacja na GitHub Pages ---------- */
+const GH_KEY="awarie.github.v1", GH_LAST="awarie.github.last";
+let gh={repo:"",branch:"main",token:""};
+try{ Object.assign(gh, JSON.parse(localStorage.getItem(GH_KEY)||"{}")); }catch(e){}
+// strona hostowana na <login>.github.io/<repo>/ — podpowiedz repozytorium
+if (!gh.repo && /\.github\.io$/i.test(location.hostname)){
+  const login=location.hostname.split(".")[0], repo=location.pathname.split("/").filter(Boolean)[0];
+  if (repo && !/\.html?$/i.test(repo)) gh.repo=`${login}/${repo}`;
+}
+function pagesUrl(){
+  const m=/^([^\/\s]+)\/([^\/\s]+)$/.exec(gh.repo.trim()); if(!m) return "";
+  return m[2].toLowerCase()===`${m[1].toLowerCase()}.github.io` ? `https://${m[2].toLowerCase()}/` : `https://${m[1].toLowerCase()}.github.io/${m[2]}/`;
+}
+function publishList(){
+  let list=active().map(d=>({...d,...enrich(d)}));
+  if ($("#onlyList").checked && master) list=list.filter(d=>d.inList);
+  return list.sort((a,b)=>b.sev-a.sev || b.noPay-a.noPay || a.minHours-b.minHours);
+}
+function viewData(list){
+  const n=new Date();
+  return {
+    version:1,
+    exportAt: exportAt ? fmtUTC(exportAt) : "—",
+    exportAtWall: exportAt || null,
+    generated: `${p2(n.getDate())}.${p2(n.getMonth()+1)}.${n.getFullYear()} ${p2(n.getHours())}:${p2(n.getMinutes())}`,
+    publishedAt: n.toISOString(),
+    period: $("#period").selectedOptions[0].textContent.trim(),
+    hasCtrl: !!master,
+    items: list.map(d=>({code:d.code, loc:d.loc, addr:d.addr, ctrl:d.ctrl, co:d.co, sev:d.sev, noPay:d.noPay, tickets:d.tickets, batt:d.batt,
+      faults:d.faults.map(f=>({color:f.color, status:f.status, start:f.start?`${p2(f.start.d)}.${p2(f.start.mo)} ${p2(f.start.h)}:${p2(f.start.mi)}`:""}))}))
+  };
+}
+function b64utf8(s){
+  const bytes=new TextEncoder().encode(s); let bin="";
+  for (let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+0x8000));
+  return btoa(bin);
+}
+async function ghCall(method, path, body){
+  const r=await fetch(`https://api.github.com/repos/${gh.repo.trim()}/${path}`,{
+    method, cache:"no-store",
+    headers:{"Accept":"application/vnd.github+json","Authorization":`Bearer ${gh.token.trim()}`,"X-GitHub-Api-Version":"2022-11-28",...(body?{"Content-Type":"application/json"}:{})},
+    body: body?JSON.stringify(body):undefined
+  });
+  let j=null; try{ j=await r.json(); }catch(e){}
+  return {status:r.status, ok:r.ok, json:j};
+}
+function ghError(r){
+  if (r.status===401) return "Token jest nieprawidłowy albo wygasł. Utwórz nowy token na GitHubie i wklej go w Ustawieniach.";
+  if (r.status===403) return "Token nie ma uprawnienia do zapisu. Przy tworzeniu tokenu ustaw „Contents: Read and write” dla tego repozytorium.";
+  if (r.status===404) return "Nie znaleziono repozytorium. Sprawdź nazwę (login/nazwa) i czy token ma dostęp do tego repozytorium.";
+  if (r.status===409) return "Ktoś opublikował dane w tym samym momencie. Kliknij „Opublikuj” jeszcze raz.";
+  if (r.status===422) return "GitHub odrzucił plik ("+(r.json?.message||"błąd 422")+"). Sprawdź nazwę gałęzi.";
+  return "GitHub odpowiedział błędem "+r.status+(r.json?.message?`: ${r.json.message}`:"")+".";
+}
+async function ghCheck(){
+  const r=await ghCall("GET","");
+  if (!r.ok) return ghError(r);
+  if (r.json && r.json.permissions && !r.json.permissions.push) return "Token ma tylko odczyt. Przy tworzeniu tokenu ustaw „Contents: Read and write”.";
+  return null;
+}
+function renderPub(){
+  const url=pagesUrl(), ready=!!(url && gh.token);
+  $("#pubLink").innerHTML = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a>` : "Najpierw uzupełnij ustawienia publikacji.";
+  let last=null; try{ last=JSON.parse(localStorage.getItem(GH_LAST)||"null"); }catch(e){}
+  $("#pubLast").textContent = last ? `Ostatnia publikacja: ${last.when} — ${last.count} parkometrów (eksport z ${last.exportAt})` : (ready?"":"Brak tokenu — publikacja wyłączona.");
+  const n=devices.length ? publishList().length : 0;
+  $("#pubBtn").disabled = !ready || !devices.length;
+  $("#pubBtn").textContent = devices.length ? `Opublikuj dla kontrolerów (${n})` : "Opublikuj dla kontrolerów";
+  $("#ghRepo").value=gh.repo; $("#ghBranch").value=gh.branch||"main"; $("#ghToken").value=gh.token;
+}
+async function doPublish(){
+  const msg=$("#pubMsg"), btn=$("#pubBtn");
+  msg.className="msg"; msg.textContent="Publikuję…"; btn.disabled=true;
+  try{
+    const list=publishList();
+    const data=viewData(list);
+    const branch=(gh.branch||"main").trim();
+    const cur=await ghCall("GET",`contents/dane.json?ref=${encodeURIComponent(branch)}`);
+    if (!cur.ok && cur.status!==404){ msg.className="msg err"; msg.textContent=ghError(cur); return; }
+    if (cur.status===404){ const chk=await ghCall("GET",""); if(!chk.ok){ msg.className="msg err"; msg.textContent=ghError(chk); return; } }
+    const body={message:`Awarie — eksport z ${data.exportAt}, ${list.length} parkometrów`, content:b64utf8(JSON.stringify(data)), branch};
+    if (cur.ok && cur.json?.sha) body.sha=cur.json.sha;
+    const put=await ghCall("PUT","contents/dane.json",body);
+    if (!put.ok){ msg.className="msg err"; msg.textContent=ghError(put); return; }
+    const last={when:data.generated, count:list.length, exportAt:data.exportAt};
+    try{ localStorage.setItem(GH_LAST, JSON.stringify(last)); }catch(e){}
+    msg.className="msg ok"; msg.textContent=`Opublikowano ${list.length} parkometrów. Strona kontrolera pokaże nowe dane w ciągu 1–2 minut.`;
+  }catch(e){
+    msg.className="msg err"; msg.textContent="Nie udało się połączyć z GitHubem. Sprawdź internet i spróbuj ponownie. ("+(e?.message||e)+")";
+  }finally{ renderPub(); }
+}
+$("#pubBtn").addEventListener("click",doPublish);
+$("#pubCfgBtn").addEventListener("click",()=>{ const f=$("#pubCfg"); f.hidden=!f.hidden; $("#pubCfgBtn").setAttribute("aria-expanded",String(!f.hidden)); });
+$("#pubCfg").addEventListener("submit",async e=>{
+  e.preventDefault();
+  gh={repo:$("#ghRepo").value.trim().replace(/^https?:\/\/github\.com\//i,"").replace(/\/$/,""), branch:$("#ghBranch").value.trim()||"main", token:$("#ghToken").value.trim()};
+  try{ localStorage.setItem(GH_KEY, JSON.stringify(gh)); }catch(_){}
+  const msg=$("#pubMsg"); msg.className="msg"; msg.textContent="Sprawdzam połączenie…"; renderPub();
+  if (!gh.repo || !gh.token){ msg.className="msg err"; msg.textContent="Uzupełnij repozytorium i token."; return; }
+  try{ const err=await ghCheck(); msg.className= err?"msg err":"msg ok"; msg.textContent= err || "Połączenie działa. Możesz publikować."; if(!err){ $("#pubCfg").hidden=true; $("#pubCfgBtn").setAttribute("aria-expanded","false"); } }
+  catch(e2){ msg.className="msg err"; msg.textContent="Nie udało się połączyć z GitHubem. Sprawdź internet."; }
+});
+$("#ghForget").addEventListener("click",()=>{ gh.token=""; try{ localStorage.setItem(GH_KEY, JSON.stringify(gh)); }catch(_){} $("#pubMsg").className="msg"; $("#pubMsg").textContent="Token usunięty z tej przeglądarki."; renderPub(); });
+
+let downloadsP = null;
+function getDownloads(){
+  if (!downloadsP) downloadsP = (window.claude?.use ? window.claude.use("downloads") : Promise.resolve(null)).catch(()=>null);
+  return downloadsP;
+}
+async function doDownload(){
+  const msg=$("#dlMsg"); msg.className="msg"; msg.textContent="Przygotowuję…";
+  try{
+    const list=visible();
+    const buf=await buildWorkbook(list);
+    const t=new Date(), fname=`awarie_${t.getFullYear()}-${p2(t.getMonth()+1)}-${p2(t.getDate())}.xlsx`;
+    const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    const dl=await getDownloads();
+    if (dl){
+      try{ await dl.save({filename:fname,data:blob}); msg.textContent=`Zapisano ${fname} (${list.length} parkometrów).`; }
+      catch(e){ msg.textContent = e?.code==="declined" ? "Zapis anulowany." : e?.code==="rate_limited" ? "Okno zapisu jest już otwarte." : "Nie udało się zapisać pliku: "+(e?.message||e?.code||e); if(e?.code!=="declined") msg.className="msg err"; }
+    } else {
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click();
+      setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000);
+      msg.textContent=`Pobrano ${fname} (${list.length} parkometrów).`;
+    }
+  }catch(e){ msg.className="msg err"; msg.textContent="Błąd przy tworzeniu Excela: "+(e?.message||e); }
+}
+
+/* ---------- wczytywanie ---------- */
+function loadCsvText(text, name){
+  const rows=parseCSV(text);
+  if (rows.length<2) throw new Error("Plik nie zawiera danych.");
+  if (!norm(rows[0].join(" ")).includes("kod parkomatu") && !norm(rows[0].join(" ")).includes("status"))
+    throw new Error("To nie wygląda na eksport „Status techniczny urządzeń” (brak kolumny „Kod parkomatu”).");
+  devices=buildDevices(rows); csvName=name; catFilter=null;
+  const n=devices.filter(d=>d.faults.length).length;
+  $("#csvState").textContent=`${name} — ${devices.length} parkometrów, ${n} z komunikatem`;
+  $("#dlMsg").textContent="";
+  render();
+}
+async function onCsvFile(file){
+  try{ loadCsvText(decodeBytes(await file.arrayBuffer()), file.name); }
+  catch(e){ $("#csvState").textContent="Błąd: "+e.message; }
+}
+async function onListFile(file){
+  $("#listState").textContent="Wczytuję…";
+  try{
+    master=await readMaster(await file.arrayBuffer(), file.name);
+    try{ localStorage.setItem(LS_KEY, JSON.stringify(master)); }catch(e){}
+    $("#onlyList").checked=true;
+  }catch(e){ $("#listState").textContent="Błąd: "+e.message; return; }
+  showListState(); render();
+}
+function showListState(){
+  const lbl=$("#onlyListLbl"), cb=$("#onlyList");
+  if (master){
+    const n=Object.keys(master.map).length;
+    const inCsv=devices.filter(d=>master.map[d.code]).length;
+    $("#listState").innerHTML=`<span class="state">${esc(master.name)} — ${n} parkometrów</span> · wczytano ${esc(master.loaded)}${devices.length?` · ${inCsv} jest w eksporcie`:""}`;
+    $("#clearList").hidden=false; lbl.classList.remove("off"); cb.disabled=false;
+  } else {
+    $("#listState").textContent="Plik AWARIE.xlsx — dodaje cost center, lokalizację i kontrolera. Zostaje zapamiętana w tej przeglądarce.";
+    $("#clearList").hidden=true; lbl.classList.add("off"); cb.disabled=true; cb.checked=false;
+  }
+}
+function wireDrop(el, input, handler){
+  input.addEventListener("change",()=>{ if(input.files[0]) handler(input.files[0]); input.value=""; });
+  el.addEventListener("dragover",e=>{e.preventDefault(); el.classList.add("over");});
+  el.addEventListener("dragleave",()=>el.classList.remove("over"));
+  el.addEventListener("drop",e=>{e.preventDefault(); el.classList.remove("over"); const f=e.dataTransfer.files[0]; if(f) handler(f);});
+}
+wireDrop($("#dropCsv"),$("#fileCsv"),onCsvFile);
+wireDrop($("#dropList"),$("#fileList"),onListFile);
+$("#clearList").addEventListener("click",e=>{e.preventDefault(); e.stopPropagation(); master=null; try{localStorage.removeItem(LS_KEY);}catch(_){} showListState(); render();});
+$("#cats").addEventListener("click",e=>{const b=e.target.closest("[data-cat]"); if(!b) return; catFilter=b.dataset.cat||null; render();});
+["q","onlyList","onlyRed","sort","period"].forEach(id=>$("#"+id).addEventListener(id==="q"?"input":"change",()=>{render(); if(id==="onlyList") showListState();}));
+$("#dl").addEventListener("click",doDownload);
+$("#dlView").addEventListener("click",doView);
+
+try{ const s=localStorage.getItem(LS_KEY); if(s) master=JSON.parse(s); }catch(e){}
+if (SAMPLE){ try{ loadCsvText(SAMPLE, SAMPLE_NAME); }catch(e){} }
+showListState(); render();
+getDownloads();
+</script>
+
+</body>
+</html>
