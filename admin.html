@@ -603,9 +603,10 @@ function b64utf8(s){
   return btoa(bin);
 }
 async function ghCall(method, path, body){
-  const r=await fetch(`https://api.github.com/repos/${gh.repo.trim()}/${path}`,{
+  // bez ukośnika na końcu adresu i bez dodatkowych nagłówków — oba mogą zablokować zapytanie wstępne (CORS) w przeglądarce
+  const r=await fetch(`https://api.github.com/repos/${gh.repo.trim()}${path?"/"+path:""}`,{
     method, cache:"no-store",
-    headers:{"Accept":"application/vnd.github+json","Authorization":`Bearer ${gh.token.trim()}`,"X-GitHub-Api-Version":"2022-11-28",...(body?{"Content-Type":"application/json"}:{})},
+    headers:{"Accept":"application/vnd.github+json","Authorization":`Bearer ${gh.token.trim()}`,...(body?{"Content-Type":"application/json"}:{})},
     body: body?JSON.stringify(body):undefined
   });
   let j=null; try{ j=await r.json(); }catch(e){}
@@ -625,7 +626,13 @@ async function ghDiagnose(e){
   let netOk=false;
   try{ const r=await fetch("https://api.github.com/rate_limit",{cache:"no-store"}); netOk=r.ok || r.status<500; }catch(_){ netOk=false; }
   if (!netOk) return "Przeglądarka nie może połączyć się z serwerem api.github.com. Najczęściej blokuje go sieć firmowa (zapora) albo rozszerzenie blokujące reklamy. Spróbuj z innej sieci (np. telefon jako hotspot) albo wyłącz rozszerzenie dla tej strony. Jeśli wtedy działa, poproś IT o dopuszczenie api.github.com.";
-  return "Serwer GitHub odpowiada, ale przeglądarka odrzuciła zapytanie z tokenem ("+(e?.message||e)+"). Skopiuj token ponownie i wklej go jeszcze raz.";
+  // repozytorium bez tokenu (proste zapytanie, bez zapytania wstępnego)
+  let repoInfo="";
+  try{
+    const r=await fetch(`https://api.github.com/repos/${gh.repo.trim()}`,{cache:"no-store"});
+    repoInfo = r.ok ? "Repozytorium jest widoczne." : r.status===404 ? "Uwaga: bez tokenu GitHub nie widzi repozytorium — sprawdź nazwę i czy jest publiczne." : "";
+  }catch(_){}
+  return "Zapytania z tokenem są blokowane po drodze — GitHub ich nie dostaje. "+repoInfo+" Najczęstsze przyczyny: rozszerzenie przeglądarki (blokowanie reklam, ochrona prywatności, antywirus), ochrona przed śledzeniem w Edge albo sieć firmowa. Spróbuj w oknie incognito / InPrivate (bez rozszerzeń) albo z innej sieci, np. przez hotspot z telefonu. (Szczegóły: "+(e?.message||e)+")";
 }
 async function ghCheck(){
   const r=await ghCall("GET","");
