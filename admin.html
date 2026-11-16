@@ -619,6 +619,14 @@ function ghError(r){
   if (r.status===422) return "GitHub odrzucił plik ("+(r.json?.message||"błąd 422")+"). Sprawdź nazwę gałęzi.";
   return "GitHub odpowiedział błędem "+r.status+(r.json?.message?`: ${r.json.message}`:"")+".";
 }
+// fetch rzucił wyjątek — ustal, czy to blokada sieci, czy problem z tokenem
+async function ghDiagnose(e){
+  if (/[^!-~]/.test(gh.token)) return "Token zawiera niedozwolone znaki (np. polskie litery lub spacje). Skopiuj go jeszcze raz z GitHuba — sam token, bez dopisków.";
+  let netOk=false;
+  try{ const r=await fetch("https://api.github.com/rate_limit",{cache:"no-store"}); netOk=r.ok || r.status<500; }catch(_){ netOk=false; }
+  if (!netOk) return "Przeglądarka nie może połączyć się z serwerem api.github.com. Najczęściej blokuje go sieć firmowa (zapora) albo rozszerzenie blokujące reklamy. Spróbuj z innej sieci (np. telefon jako hotspot) albo wyłącz rozszerzenie dla tej strony. Jeśli wtedy działa, poproś IT o dopuszczenie api.github.com.";
+  return "Serwer GitHub odpowiada, ale przeglądarka odrzuciła zapytanie z tokenem ("+(e?.message||e)+"). Skopiuj token ponownie i wklej go jeszcze raz.";
+}
 async function ghCheck(){
   const r=await ghCall("GET","");
   if (!r.ok) return ghError(r);
@@ -653,19 +661,20 @@ async function doPublish(){
     try{ localStorage.setItem(GH_LAST, JSON.stringify(last)); }catch(e){}
     msg.className="msg ok"; msg.textContent=`Opublikowano ${list.length} parkometrów. Strona kontrolera pokaże nowe dane w ciągu 1–2 minut.`;
   }catch(e){
-    msg.className="msg err"; msg.textContent="Nie udało się połączyć z GitHubem. Sprawdź internet i spróbuj ponownie. ("+(e?.message||e)+")";
+    msg.className="msg err"; msg.textContent=await ghDiagnose(e);
   }finally{ renderPub(); }
 }
 $("#pubBtn").addEventListener("click",doPublish);
 $("#pubCfgBtn").addEventListener("click",()=>{ const f=$("#pubCfg"); f.hidden=!f.hidden; $("#pubCfgBtn").setAttribute("aria-expanded",String(!f.hidden)); });
 $("#pubCfg").addEventListener("submit",async e=>{
   e.preventDefault();
-  gh={repo:$("#ghRepo").value.trim().replace(/^https?:\/\/github\.com\//i,"").replace(/\/$/,""), branch:$("#ghBranch").value.trim()||"main", token:$("#ghToken").value.trim()};
+  gh={repo:$("#ghRepo").value.trim().replace(/^https?:\/\/github\.com\//i,"").replace(/\/$/,""), branch:$("#ghBranch").value.trim()||"main", token:$("#ghToken").value.replace(/[\s\u200B-\u200D\u2060\uFEFF]/g,"")};
   try{ localStorage.setItem(GH_KEY, JSON.stringify(gh)); }catch(_){}
   const msg=$("#pubMsg"); msg.className="msg"; msg.textContent="Sprawdzam połączenie…"; renderPub();
   if (!gh.repo || !gh.token){ msg.className="msg err"; msg.textContent="Uzupełnij repozytorium i token."; return; }
+  if (!/^[^\/\s]+\/[^\/\s]+$/.test(gh.repo)){ msg.className="msg err"; msg.textContent="Repozytorium wpisz w formie login/nazwa, np. arek-apcoa/awarie."; return; }
   try{ const err=await ghCheck(); msg.className= err?"msg err":"msg ok"; msg.textContent= err || "Połączenie działa. Możesz publikować."; if(!err){ $("#pubCfg").hidden=true; $("#pubCfgBtn").setAttribute("aria-expanded","false"); } }
-  catch(e2){ msg.className="msg err"; msg.textContent="Nie udało się połączyć z GitHubem. Sprawdź internet."; }
+  catch(e2){ msg.className="msg err"; msg.textContent="Sprawdzam przyczynę…"; msg.textContent=await ghDiagnose(e2); }
 });
 $("#ghForget").addEventListener("click",()=>{ gh.token=""; try{ localStorage.setItem(GH_KEY, JSON.stringify(gh)); }catch(_){} $("#pubMsg").className="msg"; $("#pubMsg").textContent="Token usunięty z tej przeglądarki."; renderPub(); });
 
